@@ -195,21 +195,18 @@ void OnPlayerSpawn(Event hEvent, const char[] sName, bool bDontBroadcast)
 
 void SetPersonaLevel(const int &iClient, const int &iLevel)
 {
-	if(iClient && !IsFakeClient(iClient))
+	// *m_pPersonaDataPublic -> m_msgObject -> player_level_ :
+
+	Address pPersonaDataPublic = view_as<Address>(LoadFromAddress(GetEntityAddress(iClient) + view_as<Address>(m_pPersonaDataPublic), NumberType_Int32));
+
+	if(pPersonaDataPublic)
 	{
-		// *m_pPersonaDataPublic -> m_msgObject -> player_level_ :
-
-		Address pPersonaDataPublic = view_as<Address>(LoadFromAddress(GetEntityAddress(iClient) + view_as<Address>(m_pPersonaDataPublic), NumberType_Int32));
-
-		if(pPersonaDataPublic)
+		if(!g_iOldPersonaRank[iClient])
 		{
-			if(!g_iOldPersonaRank[iClient])
-			{
-				g_iOldPersonaRank[iClient] = LoadFromAddress(pPersonaDataPublic + view_as<Address>(m_player_level_), NumberType_Int32);
-			}
-
-			StoreToAddress(pPersonaDataPublic + view_as<Address>(m_player_level_), iLevel, NumberType_Int32);
+			g_iOldPersonaRank[iClient] = LoadFromAddress(pPersonaDataPublic + view_as<Address>(m_player_level_), NumberType_Int32);
 		}
+
+		StoreToAddress(pPersonaDataPublic + view_as<Address>(m_player_level_), iLevel, NumberType_Int32);
 	}
 }
 
