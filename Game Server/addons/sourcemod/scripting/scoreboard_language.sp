@@ -33,7 +33,7 @@ public Plugin myinfo =
 {
 	name = "[Scoreboard] Language", 
 	author = "Wend4r", 
-	version = "1.5"
+	version = "1.5.1"
 }
 
 public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] sError, int iErrorSize)
@@ -108,7 +108,7 @@ public void OnPluginStart()
 		}
 	}
 
-	HookEvent("player_spawn", OnPlayerSpawn);
+	HookEvent("player_team", OnPlayerTeam);
 }
 
 public void OnMapStart()
@@ -177,19 +177,22 @@ public void OnClientPutInServer(int iClient)
 	}
 }
 
-void OnPlayerSpawn(Event hEvent, const char[] sName, bool bDontBroadcast)
+void OnPlayerTeam(Event hEvent, const char[] sName, bool bDontBroadcast)
 {
-	int iClient = GetClientOfUserId(hEvent.GetInt("userid"));
-
-	if(iClient && !IsFakeClient(iClient))
+	if(!hEvent.GetBool("disconnect") && !hEvent.GetInt("oldteam"))
 	{
-		SetPersonaLevel(iClient, g_iPersonaRank[iClient]);
+		int iClient = GetClientOfUserId(hEvent.GetInt("userid"));
 
-		Call_StartForward(g_hForwardLevelChange);
-		Call_PushCell(iClient);
-		Call_PushCell(g_iOldPersonaRank[iClient]);
-		Call_PushCell(g_iPersonaRank[iClient]);
-		Call_Finish();
+		if(iClient && !IsFakeClient(iClient))
+		{
+			SetPersonaLevel(iClient, g_iPersonaRank[iClient]);
+
+			Call_StartForward(g_hForwardLevelChange);
+			Call_PushCell(iClient);
+			Call_PushCell(g_iOldPersonaRank[iClient]);
+			Call_PushCell(g_iPersonaRank[iClient]);
+			Call_Finish();
+		}
 	}
 }
 
