@@ -1,7 +1,7 @@
 # Scoreboard-Language
 SourceMod plugin that sets country flags in the scoreboard
 
-<img src="//hlmod.ru/attachments/unknown-png.46435/"></img>
+<img src="https://raw.githubusercontent.com/wend4r/Scoreboard-Language/master/.github/flags.png"></img>
 
 Requirements:
 ------------
