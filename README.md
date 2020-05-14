@@ -7,4 +7,4 @@ Requirements:
 ------------
 <a href="//github.com/Accelerator74/GeoIP2/releases">GeoIP2</a>
 <br>
-<a href="//ptah.zizt.ru/">PTaH</a> not lower V1.1.2
+<a href="//github.com/komashchenko/PTaH/tree/1.1.2">PTaH</a> not lower V1.1.2
