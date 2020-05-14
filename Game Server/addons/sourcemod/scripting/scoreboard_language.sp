@@ -3,6 +3,7 @@
 #include <sourcemod>
 #include <sdkhooks>
 #include <sdktools>
+#include <PTaH>
 
 #pragma newdecls required
 #pragma tabsize 4
@@ -14,8 +15,6 @@
 #if !SPPP_COMPILER
 	#define decl static
 #endif
-
-#define SCOREBOARD_REVEAL 0
 
 #define START_XP_INDEX 1200
 #define END_XP_INDEX 1395
@@ -31,9 +30,9 @@ GlobalForward    g_hForwardLevelChange;
 // scoreboard_language.sp
 public Plugin myinfo = 
 {
-	name = "[Scoreboard] Language", 
-	author = "Wend4r", 
-	version = "1.5.1"
+	name = "[Scoreboard] Language",
+	author = "Wend4r",
+	version = "1.5.2"
 }
 
 public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] sError, int iErrorSize)
@@ -107,6 +106,8 @@ public void OnPluginStart()
 			}
 		}
 	}
+
+	PTaH(PTaH_InventoryUpdatePost, Hook, OnInventoryUpdatePost);
 
 	HookEvent("player_team", OnPlayerTeam);
 }
@@ -196,6 +197,17 @@ void OnPlayerTeam(Event hEvent, const char[] sName, bool bDontBroadcast)
 	}
 }
 
+void OnInventoryUpdatePost(int iClient, CCSPlayerInventory pInventory)
+{
+	SDKHook(iClient, SDKHook_PostThinkPost, OnClientPostThinkPost);
+}
+
+void OnClientPostThinkPost(int iClient)
+{
+	SetPersonaLevel(iClient, g_iPersonaRank[iClient]);
+	SDKUnhook(iClient, SDKHook_PostThinkPost, OnClientPostThinkPost);
+}
+
 void SetPersonaLevel(const int &iClient, const int &iLevel)
 {
 	// *m_pPersonaDataPublic -> m_msgObject -> player_level_ :
@@ -218,18 +230,3 @@ public void OnClientDisconnect(int iClient)
 	g_iOldPersonaRank[iClient] = 0;
 	g_iPersonaRank[iClient] = 0;
 }
-
-#if SCOREBOARD_REVEAL
-public void OnPlayerRunCmdPost(int iClient, int iButtons)
-{
-	static int iOldButtons[MAXPLAYERS + 1];
-
-	if(iButtons & IN_SCORE && !(iOldButtons[iClient] & IN_SCORE))
-	{
-		StartMessageOne("ServerRankRevealAll", iClient, USERMSG_BLOCKHOOKS);
-		EndMessage();
-	}
-
-	iOldButtons[iClient] = iButtons;
-}
-#endif
