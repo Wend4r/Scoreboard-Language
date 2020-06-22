@@ -10,7 +10,7 @@
 
 #include <geoip>
 
-#define SPPP_COMPILER 1
+#define SPPP_COMPILER 0
 
 #if !SPPP_COMPILER
 	#define decl static
@@ -161,12 +161,12 @@ public void OnClientPutInServer(int iClient)
 
 		GetClientIP(iClient, sIP, sizeof(sIP));
 
-		int iIndex = g_hFlagCodes.FindString(sCode);
+		decl int iIndex;
 
-		if(iIndex != -1 && strncmp(sIP, "192.168.1", 9) && GeoipCode2(sIP, sCode))
+		if(strncmp(sIP, "192.168.1", 9) && GeoipCode2(sIP, sCode) && (iIndex = g_hFlagCodes.FindString(sCode)))
 		{
 			g_iPersonaRank[iClient] = g_hFlagIndexes.Get(iIndex);
-
+			
 			return;
 		}
 		
@@ -182,9 +182,15 @@ void OnPlayerSpawn(Event hEvent, const char[] sName, bool bDontBroadcast)
 
 		if(iClient && !IsFakeClient(iClient))
 		{
-			LoadFlags(iClient);
+			SDKHook(iClient, SDKHook_PostThinkPost, OnLoadClientPostThinkPost);
 		}
 	}
+}
+
+void OnLoadClientPostThinkPost(int iClient)
+{
+	LoadFlags(iClient);
+	SDKUnhook(iClient, SDKHook_PostThinkPost, OnLoadClientPostThinkPost);
 }
 
 void LoadFlags(const int &iClient)
