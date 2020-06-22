@@ -10,20 +10,20 @@
 
 #include <geoip>
 
-#define SPPP_COMPILER 0
+#define SPPP_COMPILER 1
 
 #if !SPPP_COMPILER
 	#define decl static
 #endif
 
-#define START_XP_INDEX 1200
-#define END_XP_INDEX 1395
-
 int              g_iOldPersonaRank[MAXPLAYERS + 1],
                  g_iPersonaRank[MAXPLAYERS + 1],
                  m_pPersonaDataPublic;		// CEconPersonaDataPublic : GCSDK::CProtoBufSharedObject
 
-static const int m_player_level_ = 16;		// m_msgObject (CSOPersonaDataPublic) => 4 + player_level_ (int) => 12
+static const int m_player_level_ = 16;		// CEconPersonaDataPublic::player_level_ (int) => 16
+
+ArrayList        g_hFlagCodes,
+                 g_hFlagIndexes;
 
 GlobalForward    g_hForwardLevelChange;
 
@@ -32,7 +32,8 @@ public Plugin myinfo =
 {
 	name = "[Scoreboard] Language",
 	author = "Wend4r",
-	version = "1.5.2"
+	version = "1.6.0",
+	url = "Discord: Wend4r#0001 | VK: vk.com/wend4r"
 }
 
 public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] sError, int iErrorSize)
@@ -94,6 +95,9 @@ public void OnPluginStart()
 
 	m_pPersonaDataPublic = FindSendPropInfo("CCSPlayer", "m_unMusicID") + 10;		// 2 + 1 + 2 + 1 + 4. HARD OFFSET. OHH YEEE :D
 
+	g_hFlagCodes = new ArrayList(2);		// char[8]
+	g_hFlagIndexes = new ArrayList();		// int
+
 	for(int i = MaxClients + 1; --i;)
 	{
 		if(IsClientInGame(i))
@@ -114,62 +118,53 @@ public void OnPluginStart()
 
 public void OnMapStart()
 {
-	decl char sBuffer[PLATFORM_MAX_PATH];
+	static char sPath[PLATFORM_MAX_PATH];
 
-	for(int i = START_XP_INDEX; i != END_XP_INDEX; i++)
+	if(!sPath[0])
 	{
-		FormatEx(sBuffer, sizeof(sBuffer), "materials/panorama/images/icons/xp/level%i.png", i);
-		AddFileToDownloadsTable(sBuffer);
+		BuildPath(Path_SM, sPath, sizeof(sPath), "configs/scoreboard_language.ini");
 	}
 
-	AddFileToDownloadsTable("materials/panorama/images/icons/xp/level1500.png");
+	decl char sBuffer[PLATFORM_MAX_PATH];
+
+	SMCParser hParser = new SMCParser();
+
+	hParser.OnKeyValue = OnSectionSettings;
+
+	SMCError iError = hParser.ParseFile(sPath);
+
+	if(iError != SMCError_Okay)
+	{
+		hParser.GetErrorString(iError, sBuffer, sizeof(sBuffer));
+		SetFailState("%s - %s", sPath, sBuffer);
+	}
+
+	for(int i = 0, iLen = g_hFlagIndexes.Length; i != iLen; i++)
+	{
+		FormatEx(sBuffer, sizeof(sBuffer), "materials/panorama/images/icons/xp/level%i.png", g_hFlagIndexes.Get(i));
+		AddFileToDownloadsTable(sBuffer);
+	}
+}
+
+SMCResult OnSectionSettings(SMCParser hParser, const char[] sKey, const char[] sValue, bool bKeyQuotes, bool bValueQuotes)
+{
+	g_hFlagCodes.PushString(sKey);
+	g_hFlagIndexes.Push(StringToInt(sValue));
 }
 
 public void OnClientPutInServer(int iClient)
 {
 	if(!IsFakeClient(iClient))
 	{
-		decl char sLang[3], sIP[32];
-
-		static const char sCodes[][] =
-		{
-			"US", "SV", "BR", "BG", "CZ", "DK", "LU", "FL", "FR", "DE",
-			"LU", "IL", "HU", "IT", "JP", "KR", "AT", "LT", "NO", "PL",
-			"PT", "AD", "RU", "CN", "SK", "ES", "SE", "CN", "TH", "TR",
-			"UA", "SA", "GB", "MH", "BN", "BI", "SM", "MK", "BT", "GY",
-			"KI", "JM", "KN", "NA", "TT", "KM", "BZ", "TZ", "AL", "PG",
-			"ZA", "SC", "BA", "SB", "ER", "LC", "GD", "ET", "TL", "VU",
-			"AU", "AG", "VA", "TN", "XK", "PK", "FJ", "TV", "MR", "DZ",
-			"NZ", "KE", "KG", "SS", "ST", "AF", "CU", "TM", "DJ", "EC",
-			"JO", "CY", "MY", "MM", "CD", "DM", "ZW", "HR", "PH", "SZ",
-			"GQ", "NP", "SD", "BS", "MZ", "SG", "KH", "RS", "LY", "KZ",
-			"BH", "CV", "KP", "VS", "BD", "CA", "AZ", "PA", "MV", "KW",
-			"PW", "QA", "BB", "LR", "ME", "TJ", "TG", "LB", "MA", "MX",
-			"WS", "SO", "UY", "SN", "NR", "IN", "IR", "UZ", "BF", "UG",
-			"SY", "VN", "SI", "FM", "HT", "TW", "VC", "CM", "GE", "SR",
-			"LI", "CL", "GT", "BO", "GH", "GW", "AR", "MW", "CG", "DO",
-			"PY", "MD", "NI", "CF", "EG", "HN", "LA", "ZM", "LS", "MN",
-			"RW", "MT", "TO", "CH", "NE", "BY", "GR", "IS", "OM", "IQ",
-			"LK", "CR", "BW", "AE", "GM", "MU", "RO", "BJ", "GN", "MG",
-			"BE", "TD", "ML", "SL", "YE", "NL", "AM", "NG", "PE", "EE",
-			"LV", "CO", "ID", "MC", "GA"
-		};
+		decl char sCode[3], sIP[32];
 
 		GetClientIP(iClient, sIP, sizeof(sIP));
 
-		if(strncmp(sIP, "192.168.1", 9) && GeoipCode2(sIP, sLang))
+		if(strncmp(sIP, "192.168.1", 9) && GeoipCode2(sIP, sCode))
 		{
-			int iLang = 0;
+			int iIndex = g_hFlagCodes.FindString(sCode);
 
-			while(strcmp(sCodes[iLang], sLang))
-			{
-				if(++iLang == sizeof(sCodes))
-				{
-					return;
-				}
-			}
-
-			g_iPersonaRank[iClient] = START_XP_INDEX + iLang;
+			g_iPersonaRank[iClient] = iIndex != -1 || (iIndex = g_hFlagCodes.FindString("none")) != -1 ? g_hFlagCodes.Get(iIndex) : 0;
 		}
 		else
 		{
@@ -210,7 +205,7 @@ void OnClientPostThinkPost(int iClient)
 
 void SetPersonaLevel(const int &iClient, const int &iLevel)
 {
-	// *m_pPersonaDataPublic -> m_msgObject -> player_level_ :
+	// *m_pPersonaDataPublic -> player_level_ :
 
 	Address pPersonaDataPublic = view_as<Address>(LoadFromAddress(GetEntityAddress(iClient) + view_as<Address>(m_pPersonaDataPublic), NumberType_Int32));
 
