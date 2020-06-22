@@ -98,22 +98,9 @@ public void OnPluginStart()
 	g_hFlagCodes = new ArrayList(2);		// char[8]
 	g_hFlagIndexes = new ArrayList();		// int
 
-	for(int i = MaxClients + 1; --i;)
-	{
-		if(IsClientInGame(i))
-		{
-			OnClientPutInServer(i);
-
-			if(!IsFakeClient(i))
-			{
-				SetPersonaLevel(i, g_iPersonaRank[i]);
-			}
-		}
-	}
-
 	PTaH(PTaH_InventoryUpdatePost, Hook, OnInventoryUpdatePost);
 
-	HookEvent("player_team", OnPlayerTeam);
+	HookEvent("player_spawn", OnPlayerSpawn);
 }
 
 public void OnMapStart()
@@ -144,6 +131,20 @@ public void OnMapStart()
 		FormatEx(sBuffer, sizeof(sBuffer), "materials/panorama/images/icons/xp/level%i.png", g_hFlagIndexes.Get(i));
 		AddFileToDownloadsTable(sBuffer);
 	}
+
+	for(int i = MaxClients + 1; --i;)
+	{
+		if(IsClientInGame(i))
+		{
+			OnClientPutInServer(i);
+
+			if(!IsFakeClient(i))
+			{
+				SetPersonaLevel(i, g_iPersonaRank[i]);
+				LoadFlags(i);
+			}
+		}
+	}
 }
 
 SMCResult OnSectionSettings(SMCParser hParser, const char[] sKey, const char[] sValue, bool bKeyQuotes, bool bValueQuotes)
@@ -160,36 +161,41 @@ public void OnClientPutInServer(int iClient)
 
 		GetClientIP(iClient, sIP, sizeof(sIP));
 
-		if(strncmp(sIP, "192.168.1", 9) && GeoipCode2(sIP, sCode))
-		{
-			int iIndex = g_hFlagCodes.FindString(sCode);
+		int iIndex = g_hFlagCodes.FindString(sCode);
 
-			g_iPersonaRank[iClient] = iIndex != -1 || (iIndex = g_hFlagCodes.FindString("none")) != -1 ? g_hFlagCodes.Get(iIndex) : 0;
-		}
-		else
+		if(iIndex != -1 && strncmp(sIP, "192.168.1", 9) && GeoipCode2(sIP, sCode))
 		{
-			g_iPersonaRank[iClient] = 1500;
+			g_iPersonaRank[iClient] = g_hFlagIndexes.Get(iIndex);
+
+			return;
 		}
+		
+		g_iPersonaRank[iClient] = (iIndex = g_hFlagCodes.FindString("none")) != -1 ? g_hFlagIndexes.Get(iIndex) : 0;
 	}
 }
 
-void OnPlayerTeam(Event hEvent, const char[] sName, bool bDontBroadcast)
+void OnPlayerSpawn(Event hEvent, const char[] sName, bool bDontBroadcast)
 {
-	if(!hEvent.GetBool("disconnect") && !hEvent.GetInt("oldteam"))
+	if(!hEvent.GetInt("teamnum"))
 	{
 		int iClient = GetClientOfUserId(hEvent.GetInt("userid"));
 
 		if(iClient && !IsFakeClient(iClient))
 		{
-			SetPersonaLevel(iClient, g_iPersonaRank[iClient]);
-
-			Call_StartForward(g_hForwardLevelChange);
-			Call_PushCell(iClient);
-			Call_PushCell(g_iOldPersonaRank[iClient]);
-			Call_PushCell(g_iPersonaRank[iClient]);
-			Call_Finish();
+			LoadFlags(iClient);
 		}
 	}
+}
+
+void LoadFlags(const int &iClient)
+{
+	SetPersonaLevel(iClient, g_iPersonaRank[iClient]);
+
+	Call_StartForward(g_hForwardLevelChange);
+	Call_PushCell(iClient);
+	Call_PushCell(g_iOldPersonaRank[iClient]);
+	Call_PushCell(g_iPersonaRank[iClient]);
+	Call_Finish();
 }
 
 void OnInventoryUpdatePost(int iClient, CCSPlayerInventory pInventory)
