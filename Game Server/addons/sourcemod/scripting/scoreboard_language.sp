@@ -18,6 +18,7 @@
 
 int              g_iOldPersonaRank[MAXPLAYERS + 1],
                  g_iPersonaRank[MAXPLAYERS + 1],
+                 g_iNoneFlagIndex,
                  m_pPersonaDataPublic;		// CEconPersonaDataPublic : GCSDK::CProtoBufSharedObject
 
 static const int m_player_level_ = 16;		// CEconPersonaDataPublic::player_level_ (int) => 16
@@ -60,15 +61,17 @@ int Scoreboard_SetPersonaLevel(Handle hPlugin, int iArgs)
 	int iClient = GetNativeCell(1),
 	    iLevel = GetNativeCell(2);
 
-	if(GetNativeCell(3) || !g_iPersonaRank[iClient] || g_iPersonaRank[iClient] == 1500)
+	if(GetNativeCell(3) || !g_iPersonaRank[iClient] || g_iPersonaRank[iClient] == g_iNoneFlagIndex)
 	{
 		if(iLevel == -1)
 		{
 			iLevel = g_iOldPersonaRank[iClient];
 		}
 
-		SetPersonaLevel(iClient, iLevel);
+		return SetPersonaLevel(iClient, iLevel);
 	}
+
+	return false;
 }
 
 int Scoreboard_GetPersonaLevel(Handle hPlugin, int iArgs)
@@ -131,6 +134,10 @@ public void OnMapStart()
 		SetFailState("%s - %s", sPath, sBuffer);
 	}
 
+	int iIndex = g_hFlagCodes.FindString("none");
+
+	g_iNoneFlagIndex = iIndex != -1 ? g_hFlagIndexes.Get(iIndex) : 0;
+
 	for(int i = 0, iLen = g_hFlagIndexes.Length; i != iLen; i++)
 	{
 		FormatEx(sBuffer, sizeof(sBuffer), "materials/panorama/images/icons/xp/level%i.png", g_hFlagIndexes.Get(i));
@@ -139,15 +146,10 @@ public void OnMapStart()
 
 	for(int i = MaxClients + 1; --i;)
 	{
-		if(IsClientInGame(i))
+		if(IsClientInGame(i) && !IsFakeClient(i))
 		{
-			OnClientPutInServer(i);
-
-			if(!IsFakeClient(i))
-			{
-				SetPersonaLevel(i, g_iPersonaRank[i]);
-				LoadFlags(i);
-			}
+			LoadPlayerData(i);
+			LoadFlags(i);
 		}
 	}
 }
@@ -162,21 +164,29 @@ public void OnClientPutInServer(int iClient)
 {
 	if(!IsFakeClient(iClient))
 	{
-		decl char sCode[3], sIP[32];
+		LoadPlayerData(iClient);
+	}
+}
 
-		GetClientIP(iClient, sIP, sizeof(sIP));
+void LoadPlayerData(const int &iClient)
+{
+	decl char sCode[3], sIP[32];
 
-		decl int iIndex;
+	GetClientIP(iClient, sIP, sizeof(sIP));
 
-		if(strncmp(sIP, "192.168.1", 9) && GeoipCode2(sIP, sCode) && (iIndex = g_hFlagCodes.FindString(sCode)))
+	if(strncmp(sIP, "192.168.1", 9) && GeoipCode2(sIP, sCode))
+	{
+		int iIndex = g_hFlagCodes.FindString(sCode);
+
+		if(iIndex != 0)
 		{
 			g_iPersonaRank[iClient] = g_hFlagIndexes.Get(iIndex);
 			
 			return;
 		}
-		
-		g_iPersonaRank[iClient] = (iIndex = g_hFlagCodes.FindString("none")) != -1 ? g_hFlagIndexes.Get(iIndex) : 0;
 	}
+	
+	g_iPersonaRank[iClient] = g_iNoneFlagIndex;
 }
 
 void OnPlayerSpawn(Event hEvent, const char[] sName, bool bDontBroadcast)
@@ -200,13 +210,14 @@ void OnLoadClientPostThinkPost(int iClient)
 
 void LoadFlags(const int &iClient)
 {
-	SetPersonaLevel(iClient, g_iPersonaRank[iClient]);
-
-	Call_StartForward(g_hForwardLevelChange);
-	Call_PushCell(iClient);
-	Call_PushCell(g_iOldPersonaRank[iClient]);
-	Call_PushCell(g_iPersonaRank[iClient]);
-	Call_Finish();
+	if(SetPersonaLevel(iClient, g_iPersonaRank[iClient]) && g_hForwardLevelChange.FunctionCount)
+	{
+		Call_StartForward(g_hForwardLevelChange);
+		Call_PushCell(iClient);
+		Call_PushCell(g_iOldPersonaRank[iClient]);
+		Call_PushCell(g_iPersonaRank[iClient]);
+		Call_Finish();
+	}
 }
 
 void OnInventoryUpdatePost(int iClient, CCSPlayerInventory pInventory)
@@ -220,7 +231,7 @@ void OnClientPostThinkPost(int iClient)
 	SDKUnhook(iClient, SDKHook_PostThinkPost, OnClientPostThinkPost);
 }
 
-void SetPersonaLevel(const int &iClient, const int &iLevel)
+bool SetPersonaLevel(const int &iClient, const int &iLevel)
 {
 	// *m_pPersonaDataPublic -> player_level_ :
 
@@ -234,11 +245,26 @@ void SetPersonaLevel(const int &iClient, const int &iLevel)
 		}
 
 		StoreToAddress(pPersonaDataPublic + view_as<Address>(m_player_level_), iLevel, NumberType_Int32);
+
+		return true;
 	}
+
+	return false;
 }
 
 public void OnClientDisconnect(int iClient)
 {
 	g_iOldPersonaRank[iClient] = 0;
 	g_iPersonaRank[iClient] = 0;
+}
+
+public void OnPluginEnd()
+{
+	for(int i = MaxClients + 1; --i;)
+	{
+		if(IsClientInGame(i) && !IsFakeClient(i))
+		{
+			SetPersonaLevel(i, g_iOldPersonaRank[i]);
+		}
+	}
 }

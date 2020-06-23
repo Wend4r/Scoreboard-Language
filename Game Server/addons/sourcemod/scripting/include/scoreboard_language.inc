@@ -21,9 +21,9 @@ forward void Scoreboard_LoadPersonaLevel(int iClient, int iLevel, int iOldLevel)
  * @param iLevel           Level index. -1 for setting original level.
  * @param bPriority        Sets if already exists.
  *
- * @noreturn
+ * @return                 Is successful sets.
  */
-native void Scoreboard_SetPersonaLevel(int iClient, int iLevel = -1, bool bPriority = false)
+native bool Scoreboard_SetPersonaLevel(int iClient, int iLevel = -1, bool bPriority = false)
 
 /**
  * Gets current Persona Level.
