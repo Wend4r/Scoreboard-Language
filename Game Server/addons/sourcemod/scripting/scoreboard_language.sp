@@ -32,7 +32,7 @@ public Plugin myinfo =
 {
 	name = "[Scoreboard] Language",
 	author = "Wend4r",
-	version = "1.6.0",
+	version = "1.6.1",
 	url = "Discord: Wend4r#0001 | VK: vk.com/wend4r"
 }
 
@@ -107,6 +107,8 @@ public void OnMapStart()
 {
 	static char sPath[PLATFORM_MAX_PATH];
 
+	static SMCParser hParser;
+
 	if(sPath[0])
 	{
 		g_hFlagCodes.Clear();
@@ -115,13 +117,11 @@ public void OnMapStart()
 	else
 	{
 		BuildPath(Path_SM, sPath, sizeof(sPath), "configs/scoreboard_language.ini");
+
+		hParser.OnKeyValue = OnSectionSettings;
 	}
 
 	decl char sBuffer[PLATFORM_MAX_PATH];
-
-	SMCParser hParser = new SMCParser();
-
-	hParser.OnKeyValue = OnSectionSettings;
 
 	SMCError iError = hParser.ParseFile(sPath);
 
