@@ -107,7 +107,12 @@ public void OnMapStart()
 {
 	static char sPath[PLATFORM_MAX_PATH];
 
-	if(!sPath[0])
+	if(sPath[0])
+	{
+		g_hFlagCodes.Clear();
+		g_hFlagIndexes.Clear();
+	}
+	else
 	{
 		BuildPath(Path_SM, sPath, sizeof(sPath), "configs/scoreboard_language.ini");
 	}
