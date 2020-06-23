@@ -118,7 +118,7 @@ public void OnMapStart()
 	{
 		BuildPath(Path_SM, sPath, sizeof(sPath), "configs/scoreboard_language.ini");
 
-		hParser.OnKeyValue = OnSectionSettings;
+		(hParser = new SMCParser()).OnKeyValue = OnSectionSettings;
 	}
 
 	decl char sBuffer[PLATFORM_MAX_PATH];
