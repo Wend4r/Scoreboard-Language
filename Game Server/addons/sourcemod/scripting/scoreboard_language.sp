@@ -26,14 +26,15 @@ static const int m_player_level_ = 16;		// CEconPersonaDataPublic::player_level_
 ArrayList        g_hFlagCodes,
                  g_hFlagIndexes;
 
-GlobalForward    g_hForwardLevelChange;
+GlobalForward    g_hForwardLevelChange,
+                 g_hForwardLevelChangePost;
 
 // scoreboard_language.sp
 public Plugin myinfo = 
 {
 	name = "[Scoreboard] Language",
 	author = "Wend4r",
-	version = "1.6.1",
+	version = "1.6.2",
 	url = "Discord: Wend4r#0001 | VK: vk.com/wend4r"
 }
 
@@ -49,7 +50,8 @@ public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] sError, int iErr
 	CreateNative("Scoreboard_SetPersonaLevel", Scoreboard_SetPersonaLevel);
 	CreateNative("Scoreboard_GetPersonaLevel", Scoreboard_GetPersonaLevel);
 
-	g_hForwardLevelChange = new GlobalForward("Scoreboard_LoadPersonaLevel", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
+	g_hForwardLevelChange = new GlobalForward("Scoreboard_LoadPersonaLevel", ET_Hook, Param_Cell, Param_CellByRef, Param_Cell);
+	g_hForwardLevelChangePost = new GlobalForward("Scoreboard_LoadPersonaLevelPost", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
 
 	RegPluginLibrary("scoreboard_language");
 
@@ -61,7 +63,7 @@ int Scoreboard_SetPersonaLevel(Handle hPlugin, int iArgs)
 	int iClient = GetNativeCell(1),
 	    iLevel = GetNativeCell(2);
 
-	if(GetNativeCell(3) || !g_iPersonaRank[iClient] || g_iPersonaRank[iClient] == g_iNoneFlagIndex)
+	if(IsClientInGame(iClient) && (GetNativeCell(3) || !g_iPersonaRank[iClient] || g_iPersonaRank[iClient] == g_iNoneFlagIndex))
 	{
 		if(iLevel == -1)
 		{
@@ -178,7 +180,7 @@ void LoadPlayerData(const int &iClient)
 	{
 		int iIndex = g_hFlagCodes.FindString(sCode);
 
-		if(iIndex != 0)
+		if(iIndex != -1)
 		{
 			g_iPersonaRank[iClient] = g_hFlagIndexes.Get(iIndex);
 			
@@ -210,12 +212,28 @@ void OnLoadClientPostThinkPost(int iClient)
 
 void LoadFlags(const int &iClient)
 {
-	if(SetPersonaLevel(iClient, g_iPersonaRank[iClient]) && g_hForwardLevelChange.FunctionCount)
+	if(g_hForwardLevelChange.FunctionCount)
 	{
+		decl Action iAction;
+
 		Call_StartForward(g_hForwardLevelChange);
 		Call_PushCell(iClient);
+		Call_PushCellRef(g_iPersonaRank[iClient]);
 		Call_PushCell(g_iOldPersonaRank[iClient]);
+		Call_Finish(iAction);
+
+		if(iAction == Plugin_Handled)
+		{
+			return;
+		}
+	}
+
+	if(SetPersonaLevel(iClient, g_iPersonaRank[iClient]) && g_hForwardLevelChangePost.FunctionCount)
+	{
+		Call_StartForward(g_hForwardLevelChangePost);
+		Call_PushCell(iClient);
 		Call_PushCell(g_iPersonaRank[iClient]);
+		Call_PushCell(g_iOldPersonaRank[iClient]);
 		Call_Finish();
 	}
 }
