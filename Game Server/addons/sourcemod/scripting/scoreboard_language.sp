@@ -34,7 +34,7 @@ public Plugin myinfo =
 {
 	name = "[Scoreboard] Language",
 	author = "Wend4r",
-	version = "1.6.2",
+	version = "1.6.3",
 	url = "Discord: Wend4r#0001 | VK: vk.com/wend4r"
 }
 
@@ -176,7 +176,7 @@ void LoadPlayerData(const int &iClient)
 
 	GetClientIP(iClient, sIP, sizeof(sIP));
 
-	if(strncmp(sIP, "192.168.1", 9) && GeoipCode2(sIP, sCode))
+	if(!IsLocalIP(sIP) && GeoipCode2(sIP, sCode))
 	{
 		int iIndex = g_hFlagCodes.FindString(sCode);
 
@@ -189,6 +189,23 @@ void LoadPlayerData(const int &iClient)
 	}
 	
 	g_iPersonaRank[iClient] = g_iNoneFlagIndex;
+}
+
+// by Phoenix (aka komashchenko).
+bool IsLocalIP(const char[] sIP)
+{
+	decl char sIPs[4][4];
+
+	if(ExplodeString(sIP, ".", sIPs, sizeof(sIPs), sizeof(sIPs[])) == 4)
+	{
+		int iBuf = StringToInt(sIPs[0]);
+
+		return iBuf == 10 || // 10.x.x.x
+		      (iBuf == 172 && (16 <= StringToInt(sIPs[1]) <= 31)) || // 172.16.x.x  - 172.31.x.x
+		      (iBuf == 192 && StringToInt(sIPs[1]) == 168); // 192.168.x.x
+	}
+
+	return false;
 }
 
 void OnPlayerSpawn(Event hEvent, const char[] sName, bool bDontBroadcast)
