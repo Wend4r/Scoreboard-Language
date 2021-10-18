@@ -1,0 +1,77 @@
+"Games"
+{
+	"csgo"
+	{
+		"Keys"
+		{
+			"Nearest netprop for m_pPersonaDataPublic"   "m_unMusicID"
+		}
+
+		/**
+		 * CCSPlayer struct side
+		 * ...
+		 * CNetworkVarBase<unsigned short,CCSPlayer::NetworkVar_m_unMusicID> m_unMusicID;		// 2 bytes // ->
+		 * bool m_bNeedToUpdateMusicFromInventory;		// 1 byte
+		 * unsigned __int16 m_unEquippedPlayerSprayIDs[1];		// 2 bytes
+		 * bool m_bNeedToUpdatePlayerSprayFromInventory;		// 1 byte
+		 * CEconPersonaDataPublic *m_pPersonaDataPublic;		// pointer => 4 bytes // <-
+		 * bool m_bNeedToUpdatePersonaDataPublicFromInventory;
+		 * CNetworkVarBase<bool,CCSPlayer::NetworkVar_m_bIsScoped> m_bIsScoped;
+		 * CNetworkVarBase<bool,CCSPlayer::NetworkVar_m_bIsWalking> m_bIsWalking;
+		 * ...
+		 */
+		"Offsets"
+		{
+			"Nearest netprop to m_pPersonaDataPublic"
+			{
+				"windows"   "10"
+				"linux"     "10"
+			}
+
+			// ::google::protobuf::int32 player_level_;
+			"CEconPersonaDataPublic::player_level_"
+			{
+				"windows"   "16"
+				"linux"     "16"
+			}
+		}
+
+		"Addresses"
+		{
+			//   GCSDK::CSharedObject::RegisterFactory(
+			//    2,
+			//    GCSDK::CreateSharedObjectSubclass<CEconPersonaDataPublic>,		// <-
+			//    0,
+			//    "CEconPersonaDataPublic",
+			//    "BuildCacheSubscribed(CEconPersonaDataPublic)",
+			//    "Create(CEconPersonaDataPublic)",
+			//    "Update(CEconPersonaDataPublic)");
+			"GCSDK::CreateSharedObjectSubclass<CEconPersonaDataPublic>"
+			{
+				"windows"
+				{
+					"signature" "CInventoryManager::Init"
+
+					"read"      "164"			// 0xA4
+				}
+
+				"linux"
+				{
+					"signature" "CInventoryManager::Init"
+
+					"read"      "170"		// 0xAA
+				}
+			}
+		}
+
+		"Signatures"
+		{
+			"CInventoryManager::Init"
+			{
+				"library"   "server"
+				"windows"   "\x55\x8B\xEC\x83\xEC\x1C\x8D\x45\xE4\xC7\x45\xE4\x01\x00\x00\x00"
+				"linux"     "\x55\x89\xE5\x83\xEC\x28\xC7\x44\x24\x18"
+			}
+		}
+	}
+}
