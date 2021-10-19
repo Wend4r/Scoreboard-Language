@@ -1,0 +1,5 @@
+# Workspaces
+.vscode*/
+
+# Binary files
+addons/sourcemod/plugins*/
