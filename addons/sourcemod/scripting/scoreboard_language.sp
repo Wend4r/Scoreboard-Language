@@ -99,6 +99,7 @@ public void OnPluginStart()
 		static const char szGameData[] = "econ_persona_data_public.games",
 		                  szNearestNetpropForPersonaDataPublicKey[] = "Nearest netprop for m_pPersonaDataPublic",
 		                  szNearestNetpropToPersonaDataPublicOffset[] = "Nearest netprop to m_pPersonaDataPublic",
+		                  szEconPersonaDataPublicPlayerLevelOffset[] = "CEconPersonaDataPublic::player_level_",
 		                  szCreateEconPersonaDataPublicAddress[] = "GCSDK::CreateSharedObjectSubclass<CEconPersonaDataPublic>";
 
 		GameData hGameData = new GameData(szGameData);
@@ -130,6 +131,15 @@ public void OnPluginStart()
 			}
 
 			m_pPersonaDataPublic += iOffset;
+
+			iOffset = hGameData.GetOffset(szEconPersonaDataPublicPlayerLevelOffset);
+
+			if(iOffset == -1)
+			{
+				SetFailState("Failed to get \"%s\" offset", szEconPersonaDataPublicPlayerLevelOffset);
+			}
+
+			m_player_level_ = iOffset;
 		}
 
 		StartPrepSDKCall(SDKCall_Static);
