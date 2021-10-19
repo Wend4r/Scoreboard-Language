@@ -3,38 +3,59 @@
 #include <sourcemod>
 #include <sdkhooks>
 #include <sdktools>
-#include <PTaH>
 
 #pragma newdecls required
 #pragma tabsize 4
 
+#include <PTaH>
 #include <geoip>
 
-#define SPPP_COMPILER 0
-
-#if !SPPP_COMPILER
+#if !defined SPPP_COMPILER
 	#define decl static
 #endif
+
+enum PrimeStatus
+{
+	PrimeStatus_Failed = -2,
+	PrimeStatus_Unknown = -1,
+	PrimeStatus_None = 0,
+	PrimeStatus_Has = 1,
+};
+
+enum struct FlagData
+{
+	char sCountryCode[8];
+	int  iIndex;
+
+	void ParseKeyValue(const char[] szKey, const char[] szValue)
+	{
+		strcopy(this.sCountryCode, sizeof(this.sCountryCode), szKey);		// Requires a SPComp 1.11 compiler.
+		this.iIndex = StringToInt(szValue);
+	}
+} // ;
 
 int              g_iOldPersonaRank[MAXPLAYERS + 1],
                  g_iPersonaRank[MAXPLAYERS + 1],
                  g_iNoneFlagIndex,
-                 m_pPersonaDataPublic;		// CEconPersonaDataPublic : GCSDK::CProtoBufSharedObject
+                 m_pPersonaDataPublic,
+                 m_player_level_,
+                 m_elevated_state_;
 
-static const int m_player_level_ = 16;		// CEconPersonaDataPublic::player_level_ (int) => 16
-
-ArrayList        g_hFlagCodes,
-                 g_hFlagIndexes;
+ArrayList        g_hFlagsData;
 
 GlobalForward    g_hForwardLevelChange,
                  g_hForwardLevelChangePost;
+
+Handle           g_hCreateEconPersonaDataPublic;
+
+PrimeStatus      g_eOldPrimeStatus[MAXPLAYERS + 1] = {PrimeStatus_Unknown, ...};
 
 // scoreboard_language.sp
 public Plugin myinfo = 
 {
 	name = "[Scoreboard] Language",
 	author = "Wend4r",
-	version = "1.6.3",
+	version = "1.6.4",
 	url = "Discord: Wend4r#0001 | VK: vk.com/wend4r"
 }
 
@@ -49,6 +70,7 @@ public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] sError, int iErr
 
 	CreateNative("Scoreboard_SetPersonaLevel", Scoreboard_SetPersonaLevel);
 	CreateNative("Scoreboard_GetPersonaLevel", Scoreboard_GetPersonaLevel);
+	CreateNative("Scoreboard_GetPlayerPrimeStatus", Scoreboard_GetPlayerPrimeStatus);
 
 	g_hForwardLevelChange = new GlobalForward("Scoreboard_LoadPersonaLevel", ET_Hook, Param_Cell, Param_CellByRef, Param_Cell);
 	g_hForwardLevelChangePost = new GlobalForward("Scoreboard_LoadPersonaLevelPost", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
@@ -83,25 +105,83 @@ int Scoreboard_GetPersonaLevel(Handle hPlugin, int iArgs)
 	return GetNativeCell(2) ? g_iOldPersonaRank[iClient] : g_iPersonaRank[iClient];
 }
 
+int Scoreboard_GetPlayerPrimeStatus(Handle hPlugin, int iArgs)
+{
+	return view_as<int>(g_eOldPrimeStatus[GetNativeCell(1)]);
+}
+
 public void OnPluginStart()
 {
-	/* in CCSPlayer struct side
-		...
-		CNetworkVarBase<unsigned short,CCSPlayer::NetworkVar_m_unMusicID> m_unMusicID;		// 2 bytes // ->
-		bool m_bNeedToUpdateMusicFromInventory;		// 1 byte
-		unsigned __int16 m_unEquippedPlayerSprayIDs[1];		// 2 bytes
-		bool m_bNeedToUpdatePlayerSprayFromInventory;		// 1 byte
-		CEconPersonaDataPublic *m_pPersonaDataPublic;		// pointer => 4 bytes // <-
-		bool m_bNeedToUpdatePersonaDataPublicFromInventory;
-		CNetworkVarBase<bool,CCSPlayer::NetworkVar_m_bIsScoped> m_bIsScoped;
-		CNetworkVarBase<bool,CCSPlayer::NetworkVar_m_bIsWalking> m_bIsWalking;
-		...
-	*/
+	{
+		static const char szGameData[] = "econ_persona_data_public.games",
+		                  szNearestNetpropForPersonaDataPublicKey[] = "Nearest netprop for m_pPersonaDataPublic",
+		                  szNearestNetpropToPersonaDataPublicOffset[] = "Nearest netprop to m_pPersonaDataPublic",
+		                  szEconPersonaDataPublicPlayerLevelOffset[] = "CEconPersonaDataPublic::player_level_",
+		                  szEconPersonaDataPublicElevatedStateOffset[] = "CEconPersonaDataPublic::elevated_state_",
+		                  szCreateEconPersonaDataPublicAddress[] = "GCSDK::CreateSharedObjectSubclass<CEconPersonaDataPublic>";
 
-	m_pPersonaDataPublic = FindSendPropInfo("CCSPlayer", "m_unMusicID") + 10;		// 2 + 1 + 2 + 1 + 4. HARD OFFSET. OHH YEEE :D
+		GameData hGameData = new GameData(szGameData);
 
-	g_hFlagCodes = new ArrayList(2);		// char[8]
-	g_hFlagIndexes = new ArrayList();		// int
+		if(!hGameData)
+		{
+			SetFailState("Failed to initialize \"gamedata/%s.txt\" gamedata file", szGameData);
+		}
+
+		{
+			decl char sValue[64];
+
+			if(hGameData.GetKeyValue(szNearestNetpropForPersonaDataPublicKey, sValue, sizeof(sValue)))
+			{
+				m_pPersonaDataPublic = FindSendPropInfo("CCSPlayer", sValue);
+			}
+			else
+			{
+				SetFailState("Failed to get \"%s\" key value", szNearestNetpropForPersonaDataPublicKey);
+			}
+		}
+
+		{
+			int iOffset = hGameData.GetOffset(szNearestNetpropToPersonaDataPublicOffset);
+
+			if(iOffset == -1)
+			{
+				SetFailState("Failed to get \"%s\" offset", szNearestNetpropToPersonaDataPublicOffset);
+			}
+
+			m_pPersonaDataPublic += iOffset;
+
+			iOffset = hGameData.GetOffset(szEconPersonaDataPublicPlayerLevelOffset);
+
+			if(iOffset == -1)
+			{
+				SetFailState("Failed to get \"%s\" offset", szEconPersonaDataPublicPlayerLevelOffset);
+			}
+
+			m_player_level_ = iOffset;
+
+			iOffset = hGameData.GetOffset(szEconPersonaDataPublicElevatedStateOffset);
+
+			if(iOffset == -1)
+			{
+				SetFailState("Failed to get \"%s\" offset", szEconPersonaDataPublicElevatedStateOffset);
+			}
+
+			m_elevated_state_ = iOffset;
+		}
+
+		StartPrepSDKCall(SDKCall_Static);
+		PrepSDKCall_SetFromConf(hGameData, SDKConf_Address, szCreateEconPersonaDataPublicAddress);
+		PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+
+		if(!(g_hCreateEconPersonaDataPublic = EndPrepSDKCall()))
+		{
+			SetFailState("Failed to get \"%s\" address", szCreateEconPersonaDataPublicAddress);
+		}
+
+		hGameData.Close();
+	}
+
+	g_hFlagsData = new ArrayList(sizeof(FlagData));
 
 	PTaH(PTaH_InventoryUpdatePost, Hook, OnInventoryUpdatePost);
 
@@ -116,8 +196,7 @@ public void OnMapStart()
 
 	if(sPath[0])
 	{
-		g_hFlagCodes.Clear();
-		g_hFlagIndexes.Clear();
+		g_hFlagsData.Clear();
 	}
 	else
 	{
@@ -136,13 +215,13 @@ public void OnMapStart()
 		SetFailState("%s - %s", sPath, sBuffer);
 	}
 
-	int iIndex = g_hFlagCodes.FindString("none");
+	int iIndex = g_hFlagsData.FindString("none");
 
-	g_iNoneFlagIndex = iIndex != -1 ? g_hFlagIndexes.Get(iIndex) : 0;
+	g_iNoneFlagIndex = iIndex != -1 ? g_hFlagsData.Get(iIndex, FlagData::iIndex) : 0;
 
-	for(int i = 0, iLen = g_hFlagIndexes.Length; i != iLen; i++)
+	for(int i = 0, iLen = g_hFlagsData.Length; i != iLen; i++)
 	{
-		FormatEx(sBuffer, sizeof(sBuffer), "materials/panorama/images/icons/xp/level%i.png", g_hFlagIndexes.Get(i));
+		FormatEx(sBuffer, sizeof(sBuffer), "materials/panorama/images/icons/xp/level%i.png", g_hFlagsData.Get(i, FlagData::iIndex));
 		AddFileToDownloadsTable(sBuffer);
 	}
 
@@ -156,10 +235,12 @@ public void OnMapStart()
 	}
 }
 
-SMCResult OnSectionSettings(SMCParser hParser, const char[] sKey, const char[] sValue, bool bKeyQuotes, bool bValueQuotes)
+SMCResult OnSectionSettings(SMCParser hParser, const char[] szKey, const char[] szValue, bool bKeyQuotes, bool bValueQuotes)
 {
-	g_hFlagCodes.PushString(sKey);
-	g_hFlagIndexes.Push(StringToInt(sValue));
+	decl FlagData aFlag;
+
+	aFlag.ParseKeyValue(szKey, szValue);
+	g_hFlagsData.PushArray(aFlag, sizeof(aFlag));
 }
 
 public void OnClientPutInServer(int iClient)
@@ -170,7 +251,7 @@ public void OnClientPutInServer(int iClient)
 	}
 }
 
-void LoadPlayerData(const int &iClient)
+void LoadPlayerData(int iClient)
 {
 	decl char sCode[3], sIP[32];
 
@@ -178,11 +259,11 @@ void LoadPlayerData(const int &iClient)
 
 	if(!IsLocalIP(sIP) && GeoipCode2(sIP, sCode))
 	{
-		int iIndex = g_hFlagCodes.FindString(sCode);
+		int iIndex = g_hFlagsData.FindString(sCode);
 
 		if(iIndex != -1)
 		{
-			g_iPersonaRank[iClient] = g_hFlagIndexes.Get(iIndex);
+			g_iPersonaRank[iClient] = g_hFlagsData.Get(iIndex, FlagData::iIndex);
 			
 			return;
 		}
@@ -192,11 +273,11 @@ void LoadPlayerData(const int &iClient)
 }
 
 // by Phoenix (aka komashchenko).
-bool IsLocalIP(const char[] sIP)
+bool IsLocalIP(const char[] szIP)
 {
 	decl char sIPs[4][4];
 
-	if(ExplodeString(sIP, ".", sIPs, sizeof(sIPs), sizeof(sIPs[])) == 4)
+	if(ExplodeString(szIP, ".", sIPs, sizeof(sIPs), sizeof(sIPs[])) == 4)
 	{
 		int iBuf = StringToInt(sIPs[0]);
 
@@ -208,7 +289,7 @@ bool IsLocalIP(const char[] sIP)
 	return false;
 }
 
-void OnPlayerSpawn(Event hEvent, const char[] sName, bool bDontBroadcast)
+void OnPlayerSpawn(Event hEvent, const char[] szName, bool bDontBroadcast)
 {
 	if(!hEvent.GetInt("teamnum"))
 	{
@@ -227,7 +308,7 @@ void OnLoadClientPostThinkPost(int iClient)
 	SDKUnhook(iClient, SDKHook_PostThinkPost, OnLoadClientPostThinkPost);
 }
 
-void LoadFlags(const int &iClient)
+void LoadFlags(int iClient)
 {
 	if(g_hForwardLevelChange.FunctionCount)
 	{
@@ -266,31 +347,40 @@ void OnClientPostThinkPost(int iClient)
 	SDKUnhook(iClient, SDKHook_PostThinkPost, OnClientPostThinkPost);
 }
 
-bool SetPersonaLevel(const int &iClient, const int &iLevel)
+bool SetPersonaLevel(int iClient, int iLevel)
 {
-	// *m_pPersonaDataPublic -> player_level_ :
-
-	Address pPersonaDataPublic = view_as<Address>(LoadFromAddress(GetEntityAddress(iClient) + view_as<Address>(m_pPersonaDataPublic), NumberType_Int32));
+	Address pPersonaDataPublic = view_as<Address>(GetEntData(iClient, m_pPersonaDataPublic));
 
 	if(pPersonaDataPublic)
 	{
 		if(!g_iOldPersonaRank[iClient])
 		{
 			g_iOldPersonaRank[iClient] = LoadFromAddress(pPersonaDataPublic + view_as<Address>(m_player_level_), NumberType_Int32);
+			g_eOldPrimeStatus[iClient] = view_as<PrimeStatus>(LoadFromAddress(pPersonaDataPublic + view_as<Address>(m_elevated_state_), NumberType_Int8));
 		}
 
 		StoreToAddress(pPersonaDataPublic + view_as<Address>(m_player_level_), iLevel, NumberType_Int32);
+		StoreToAddress(pPersonaDataPublic + view_as<Address>(m_elevated_state_), true, NumberType_Int8);
+	}
+	else		// Non-steam player or lost connection with GameCoordinator.
+	{
+		g_eOldPrimeStatus[iClient] = PrimeStatus_Failed;
 
-		return true;
+		Address pNewPersonaPublic = SDKCall(g_hCreateEconPersonaDataPublic);		// Inclusive memory allocation from g_pMemAlloc .
+
+		StoreToAddress(pNewPersonaPublic + view_as<Address>(m_player_level_), iLevel, NumberType_Int32);
+		StoreToAddress(pNewPersonaPublic + view_as<Address>(m_elevated_state_), true, NumberType_Int8);
+		SetEntData(iClient, m_pPersonaDataPublic, pNewPersonaPublic);		// pNewPersonaPublic must be free in CCSPlayer::~CCSPlayer() .
 	}
 
-	return false;
+	return true;		// Backward compatibility.
 }
 
 public void OnClientDisconnect(int iClient)
 {
 	g_iOldPersonaRank[iClient] = 0;
 	g_iPersonaRank[iClient] = 0;
+	g_eOldPrimeStatus[iClient] = PrimeStatus_Unknown;
 }
 
 public void OnPluginEnd()

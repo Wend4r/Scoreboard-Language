@@ -35,8 +35,16 @@
 #endif
 #define _scoreboard_language_included
 
+enum PrimeStatus
+{
+	PrimeStatus_Failed = -2,
+	PrimeStatus_Unknown = -1,
+	PrimeStatus_None = 0,
+	PrimeStatus_Has = 1,
+};
+
 /**
- * Called when the admin menu is ready to have items added.
+ * Called when the custom Persona Level is ready to works.
  * 
  * @param iClient          Client index.
  * @param iLevel           Level index from core. As reference.
@@ -47,7 +55,7 @@
 forward Action Scoreboard_LoadPersonaLevel(int iClient, int &iLevel, int iOldLevel);
 
 /**
- * Called after the admin menu is ready to have items added.
+ * Called after the custom Persona Level is ready to works.
  * 
  * @param iClient          Client index.
  * @param iLevel           Level index from core.
@@ -78,6 +86,16 @@ native void Scoreboard_SetPersonaLevel(int iClient, int iLevel = -1, bool bPrior
  */
 native int Scoreboard_GetPersonaLevel(int iClient, bool bIsOld = false);
 
+/**
+ * Gets the player Prime Status.
+ * Use in Scoreboard_LoadPersonaLevelPost() .
+ *
+ * @param iClient          Client index.
+ *
+ * @return                 Prime Status enumeration value.
+ */
+native PrimeStatus Scoreboard_GetPlayerPrimeStatus(int iClient);
+
 
 
 public SharedPlugin __pl_scoreboard_language = 
@@ -96,5 +114,6 @@ public void __pl_scoreboard_language_SetNTVOptional()
 {
 	MarkNativeAsOptional("Scoreboard_SetPersonaLevel");
 	MarkNativeAsOptional("Scoreboard_GetPersonaLevel");
+	MarkNativeAsOptional("Scoreboard_GetPlayerPrimeStatus");
 }
 #endif
