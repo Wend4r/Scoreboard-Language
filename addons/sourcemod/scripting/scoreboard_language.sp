@@ -14,23 +14,32 @@
 	#define decl static
 #endif
 
+enum PrimeStatus
+{
+	PrimeStatus_Failed = -2,
+	PrimeStatus_Unknown = -1,
+	PrimeStatus_None = 0,
+	PrimeStatus_Has = 1,
+};
+
 enum struct FlagData
 {
-	char sCountryCode[4];
+	char sCountryCode[8];
 	int  iIndex;
 
 	void ParseKeyValue(const char[] szKey, const char[] szValue)
 	{
-		strcopy(this.sCountryCode, sizeof(this.sCountryCode), szKey);
+		strcopy(this.sCountryCode, sizeof(this.sCountryCode), szKey);		// Requires a SPComp 1.11 compiler.
 		this.iIndex = StringToInt(szValue);
 	}
-}
+} // ;
 
 int              g_iOldPersonaRank[MAXPLAYERS + 1],
                  g_iPersonaRank[MAXPLAYERS + 1],
                  g_iNoneFlagIndex,
                  m_pPersonaDataPublic,
-                 m_player_level_;
+                 m_player_level_,
+                 m_elevated_state_;
 
 ArrayList        g_hFlagsData;
 
@@ -38,6 +47,8 @@ GlobalForward    g_hForwardLevelChange,
                  g_hForwardLevelChangePost;
 
 Handle           g_hCreateEconPersonaDataPublic;
+
+PrimeStatus      g_eOldPrimeStatus[MAXPLAYERS + 1] = {PrimeStatus_Unknown, ...};
 
 // scoreboard_language.sp
 public Plugin myinfo = 
@@ -59,6 +70,7 @@ public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] sError, int iErr
 
 	CreateNative("Scoreboard_SetPersonaLevel", Scoreboard_SetPersonaLevel);
 	CreateNative("Scoreboard_GetPersonaLevel", Scoreboard_GetPersonaLevel);
+	CreateNative("Scoreboard_GetPlayerPrimeStatus", Scoreboard_GetPlayerPrimeStatus);
 
 	g_hForwardLevelChange = new GlobalForward("Scoreboard_LoadPersonaLevel", ET_Hook, Param_Cell, Param_CellByRef, Param_Cell);
 	g_hForwardLevelChangePost = new GlobalForward("Scoreboard_LoadPersonaLevelPost", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
@@ -93,6 +105,11 @@ int Scoreboard_GetPersonaLevel(Handle hPlugin, int iArgs)
 	return GetNativeCell(2) ? g_iOldPersonaRank[iClient] : g_iPersonaRank[iClient];
 }
 
+int Scoreboard_GetPlayerPrimeStatus(Handle hPlugin, int iArgs)
+{
+	return view_as<int>(g_eOldPrimeStatus[GetNativeCell(1)]);
+}
+
 public void OnPluginStart()
 {
 	{
@@ -100,6 +117,7 @@ public void OnPluginStart()
 		                  szNearestNetpropForPersonaDataPublicKey[] = "Nearest netprop for m_pPersonaDataPublic",
 		                  szNearestNetpropToPersonaDataPublicOffset[] = "Nearest netprop to m_pPersonaDataPublic",
 		                  szEconPersonaDataPublicPlayerLevelOffset[] = "CEconPersonaDataPublic::player_level_",
+		                  szEconPersonaDataPublicElevatedStateOffset[] = "CEconPersonaDataPublic::elevated_state_",
 		                  szCreateEconPersonaDataPublicAddress[] = "GCSDK::CreateSharedObjectSubclass<CEconPersonaDataPublic>";
 
 		GameData hGameData = new GameData(szGameData);
@@ -140,6 +158,15 @@ public void OnPluginStart()
 			}
 
 			m_player_level_ = iOffset;
+
+			iOffset = hGameData.GetOffset(szEconPersonaDataPublicElevatedStateOffset);
+
+			if(iOffset == -1)
+			{
+				SetFailState("Failed to get \"%s\" offset", szEconPersonaDataPublicElevatedStateOffset);
+			}
+
+			m_elevated_state_ = iOffset;
 		}
 
 		StartPrepSDKCall(SDKCall_Static);
@@ -322,8 +349,6 @@ void OnClientPostThinkPost(int iClient)
 
 bool SetPersonaLevel(int iClient, int iLevel)
 {
-	// *m_pPersonaDataPublic -> player_level_ :
-
 	Address pPersonaDataPublic = view_as<Address>(GetEntData(iClient, m_pPersonaDataPublic));
 
 	if(pPersonaDataPublic)
@@ -331,27 +356,31 @@ bool SetPersonaLevel(int iClient, int iLevel)
 		if(!g_iOldPersonaRank[iClient])
 		{
 			g_iOldPersonaRank[iClient] = LoadFromAddress(pPersonaDataPublic + view_as<Address>(m_player_level_), NumberType_Int32);
+			g_eOldPrimeStatus[iClient] = view_as<PrimeStatus>(LoadFromAddress(pPersonaDataPublic + view_as<Address>(m_elevated_state_), NumberType_Int8));
 		}
 
 		StoreToAddress(pPersonaDataPublic + view_as<Address>(m_player_level_), iLevel, NumberType_Int32);
-
-		return true;
+		StoreToAddress(pPersonaDataPublic + view_as<Address>(m_elevated_state_), true, NumberType_Int8);
 	}
-	else		// Non-steam or non-prime player.
+	else		// Non-steam player or lost connection with GameCoordinator.
 	{
+		g_eOldPrimeStatus[iClient] = PrimeStatus_Failed;
+
 		Address pNewPersonaPublic = SDKCall(g_hCreateEconPersonaDataPublic);		// Inclusive memory allocation from g_pMemAlloc .
 
 		StoreToAddress(pNewPersonaPublic + view_as<Address>(m_player_level_), iLevel, NumberType_Int32);
+		StoreToAddress(pNewPersonaPublic + view_as<Address>(m_elevated_state_), true, NumberType_Int8);
 		SetEntData(iClient, m_pPersonaDataPublic, pNewPersonaPublic);		// pNewPersonaPublic must be free in CCSPlayer::~CCSPlayer() .
 	}
 
-	return false;
+	return true;		// Backward compatibility.
 }
 
 public void OnClientDisconnect(int iClient)
 {
 	g_iOldPersonaRank[iClient] = 0;
 	g_iPersonaRank[iClient] = 0;
+	g_eOldPrimeStatus[iClient] = PrimeStatus_Unknown;
 }
 
 public void OnPluginEnd()
