@@ -10,7 +10,7 @@
 #include <PTaH>
 #include <geoip>
 
-#if !SPPP_COMPILER
+#if !defined SPPP_COMPILER
 	#define decl static
 #endif
 
