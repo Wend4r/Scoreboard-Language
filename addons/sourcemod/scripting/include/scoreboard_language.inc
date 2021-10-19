@@ -36,7 +36,7 @@
 #define _scoreboard_language_included
 
 /**
- * Called when the admin menu is ready to have items added.
+ * Called when the custom Persona Level is ready to works.
  * 
  * @param iClient          Client index.
  * @param iLevel           Level index from core. As reference.
@@ -47,7 +47,7 @@
 forward Action Scoreboard_LoadPersonaLevel(int iClient, int &iLevel, int iOldLevel);
 
 /**
- * Called after the admin menu is ready to have items added.
+ * Called after the custom Persona Level is ready to works.
  * 
  * @param iClient          Client index.
  * @param iLevel           Level index from core.
