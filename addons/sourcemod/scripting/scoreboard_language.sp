@@ -96,7 +96,7 @@ int Scoreboard_GetPersonaLevel(Handle hPlugin, int iArgs)
 public void OnPluginStart()
 {
 	{
-		static const char szGameData[] = "CCSWeaponData.games.csgo",
+		static const char szGameData[] = "econ_persona_data_public.games",
 		                  szNearestNetpropForPersonaDataPublicKey[] = "Nearest netprop for m_pPersonaDataPublic",
 		                  szNearestNetpropToPersonaDataPublicOffset[] = "Nearest netprop to m_pPersonaDataPublic",
 		                  szCreateEconPersonaDataPublicAddress[] = "GCSDK::CreateSharedObjectSubclass<CEconPersonaDataPublic>";
