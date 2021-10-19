@@ -3,11 +3,11 @@
 #include <sourcemod>
 #include <sdkhooks>
 #include <sdktools>
-#include <PTaH>
 
 #pragma newdecls required
 #pragma tabsize 4
 
+#include <PTaH>
 #include <geoip>
 
 #if !SPPP_COMPILER
@@ -289,7 +289,7 @@ bool IsLocalIP(const char[] szIP)
 	return false;
 }
 
-void OnPlayerSpawn(Event hEvent, const char[] sName, bool bDontBroadcast)
+void OnPlayerSpawn(Event hEvent, const char[] szName, bool bDontBroadcast)
 {
 	if(!hEvent.GetInt("teamnum"))
 	{
