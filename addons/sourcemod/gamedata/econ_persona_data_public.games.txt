@@ -68,7 +68,7 @@
 				{
 					"signature" "CInventoryManager::Init"
 
-					"read"      "170"		// 0xAA
+					"read"      "103"		// 0x67
 				}
 			}
 		}
@@ -78,8 +78,15 @@
 			"CInventoryManager::Init"
 			{
 				"library"   "server"
+
 				"windows"   "\x55\x8B\xEC\x83\xEC\x1C\x8D\x45\xE4\xC7\x45\xE4\x01\x00\x00\x00"
-				"linux"     "\x55\x89\xE5\x83\xEC\x28\xC7\x44\x24\x18"
+
+				//FIXME: @Wend4r : UNSTABLE! 
+				// CS:GO team planned updating to glibc 2.31 . 
+				// CStike15_src build environment may have more GCC updates!
+				"linux"     "\x55\x89\xE5\x83\xEC\x0C\x68\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\x6A\x00\x68\x2A\x2A\x2A\x2A\x6A\x01\xE8"
+
+				//TODO: @Wend4r (03.02.2023): add x86_64 platforms.
 			}
 		}
 	}
